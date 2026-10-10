@@ -769,11 +769,11 @@ details.t > .body a.booklink{color:#D10000}
         <td><select id="ew_grade" class="gr" data-k="grade" aria-label="Grade">${gradeOptions(w.grade||"")}</select></td>
         <td class="c"><input id="ew_aau" type="checkbox" data-k="aau" ${w.aau?"checked":""} aria-label="AAU"></td>
         <td class="c"><input id="ew_usa" type="checkbox" data-k="usa" ${w.usa?"checked":""} aria-label="USA Wrestling"></td>
-        <td class="c" style="white-space:nowrap"><button class="primary" data-act="savew" style="padding:7px 10px">Save</button> <button data-act="cancelw" style="padding:7px 10px">Cancel</button> <button class="ghost danger" data-act="rmw">Remove</button></td></tr>`
+        <td class="c" style="white-space:nowrap"><button class="primary" data-act="savew" style="padding:7px 10px">Save</button> <button data-act="cancelw" style="padding:7px 10px">Cancel</button> <button class="ghost danger" data-act="rmw">Delete</button></td></tr>`
       : `<tr data-wid="${esc(w.id)}"><td>${esc(w.name)}</td>
         <td class="mono">${esc(w.weight||"")}</td><td class="mono">${esc(w.age||"")}</td><td>${esc(w.grade||"")}</td>
         <td class="c">${mark(w.aau,"AAU")}</td><td class="c">${mark(w.usa,"USA")}</td>
-        <td class="c"><button class="ghost" data-act="editw" aria-label="Edit ${esc(w.name)}">Edit</button></td></tr>`).join("")}</tbody></table></div>`
+        <td class="c" style="white-space:nowrap"><button class="ghost" data-act="editw" aria-label="Edit ${esc(w.name)}">Edit</button> <button class="ghost danger" data-act="rmw" aria-label="Delete ${esc(w.name)}">Delete</button></td></tr>`).join("")}</tbody></table></div>`
       : `<p class="empty-note">No wrestlers yet. Add each athlete once; you'll pick from this list for every tournament.</p>`}
     </div>`;
     $("#teamAdd").addEventListener("submit", e => {
@@ -807,7 +807,7 @@ details.t > .body a.booklink{color:#D10000}
         if (act === "savew") save();
         if (act === "rmw"){
           if (b.dataset.confirm){ editWid = null; change(d => { d.wrestlers = d.wrestlers.filter(w => w.id !== wid); d.tournaments.forEach(t => t.entries = (t.entries||[]).filter(en => en.wid !== wid)); }); }
-          else { b.dataset.confirm = "1"; b.textContent = "Confirm remove"; }
+          else { b.dataset.confirm = "1"; b.textContent = "Confirm delete"; setTimeout(() => { if (b.isConnected && b.dataset.confirm){ delete b.dataset.confirm; b.textContent = "Delete"; } }, 5000); }
         }
       });
     });
