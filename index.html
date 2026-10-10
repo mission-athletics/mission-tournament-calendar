@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1C1C1E">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Mission Tournament Calendar</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800;900&family=Big+Shoulders+Display:wght@600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a season agenda grouped by month; coaches get Schedule/Team tabs and edit tools; changes autosave to Supabase */
+:root{
+  /* Mission Athletics site theme: charcoal grounds, signal red, white type, square edges */
+  --bg:#1C1C1E; --surface:#242426; --sunk:#2E2E31; --line:#3A3A3E;
+  --ink:#FFFFFF; --muted:#A9A9AE; --accent:#FF0D0D; --accent-ink:#FFFFFF;
+  --ok:#FFFFFF; --ok-bg:#3A3A3E; --warn:#FF4D4D; --warn-bg:#3A1717; --badge:#FFFFFF; --badge-bg:#FF0D0D; --panel:#3D3D42; --panel-line:#55555B;
+  --display:"Big Shoulders","Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Poppins",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:24px 96px;display:flex;flex-direction:column;gap:22px}
+.rolebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}
+.rolebar.member{background:var(--sunk);border-color:transparent}
+.role{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;flex-wrap:wrap}
+.badge{font:700 11px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;padding:5px 8px;border-radius:4px;background:var(--badge-bg);color:var(--badge)}
+.badge.member{background:var(--surface);color:var(--muted)}
+.hint{color:var(--muted);font-weight:400}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.eyebrow{font:600 12px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(30px,6vw,44px)/1 var(--display);letter-spacing:.01em;margin:6px 0 0;text-transform:uppercase;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0}
+button{font:600 14px/1 var(--body);border-radius:6px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px}
+button:disabled{opacity:.55;cursor:default}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:transparent;border-color:transparent;color:var(--muted);padding:6px 8px}
+button.ghost:hover{color:var(--ink)}
+button.danger{color:var(--warn)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:8px;max-width:100%;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;color:var(--muted);padding:8px 14px}
+.tabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.month{display:flex;flex-direction:column;gap:10px}
+.month h2{font:700 15px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:8px 0 0;display:flex;align-items:center;gap:10px}
+.month h2::after{content:"";flex:1;height:1px;background:var(--line)}
+details.t{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+details.t[open]{border-color:var(--accent)}
+summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:12px 14px}
+summary::-webkit-details-marker{display:none}
+.date{background:var(--accent);color:var(--accent-ink);border-radius:6px;text-align:center;padding:6px 0 7px}
+.date .m{font:600 11px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+.date .d{font:700 28px/1 var(--display);font-variant-numeric:tabular-nums;margin-top:3px}
+.date .r{font:500 10px/1 var(--mono);opacity:.85;margin-top:2px}
+.tname{font:700 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.01em;overflow-wrap:anywhere}
+.tmeta{color:var(--muted);font-size:14px;margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.chips{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pill{font:600 12px/1 var(--body);padding:5px 8px;border-radius:99px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.n{background:var(--sunk);color:var(--muted)}
+.body{border-top:1px solid var(--line);padding:16px 14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.panel{display:flex;flex-direction:column;gap:8px;min-width:0}
+.panel.wide{grid-column:1/-1}
+.panel h3{font:700 14px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;font-size:14px}
+dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
+.mono{font-family:var(--mono);font-size:13px}
+.coaches{display:flex;flex-wrap:wrap;gap:6px}
+.coach{background:var(--sunk);border-radius:99px;padding:5px 10px;font-weight:600;font-size:14px}
+.empty-note{color:var(--muted);font-size:14px;font-style:italic;margin:0}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{font:600 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+tr.editing td{background:var(--warn-bg)}
+th.grp{text-align:center;padding-bottom:4px;border-bottom:1px solid var(--line)}
+th.sub{padding-top:4px}
+.affil{display:flex;align-items:center;gap:10px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.affil-l{font:600 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.c,th.c{text-align:center;width:70px}
+.mark{display:inline-block;font:700 12px/1 var(--body);padding:4px 7px;border-radius:4px}
+.mark.yes{background:var(--ok-bg);color:var(--ok)}
+.mark.no{background:var(--warn-bg);color:var(--warn)}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-width:0}
+td input.wt{width:80px;padding:5px 8px}
+td input.age{width:64px;padding:5px 8px}
+td select.gr{width:96px;padding:5px 8px}
+.teamadd{display:grid;grid-template-columns:1fr 90px 70px 100px auto auto;gap:8px;align-items:center}
+label.inline{flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:14px}
+.rowtools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.msgs{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto}
+.msg{background:var(--sunk);border-radius:8px;padding:8px 12px}
+.msg .who{font-weight:600;font-size:13px}
+.msg .when{color:var(--muted);font:500 11px/1 var(--mono);margin-left:8px}
+.msg p{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg .del{float:right}
+.compose{display:grid;grid-template-columns:140px 1fr auto;gap:6px;align-items:start}
+.compose button{align-self:end}
+.compose textarea{resize:vertical;min-height:42px}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.emptystate{background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:32px 20px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.emptystate h2{font:700 24px/1 var(--display);text-transform:uppercase;margin:0}
+.emptystate p{color:var(--muted);margin:0;max-width:52ch}
+.status{color:var(--muted);font-size:13px;font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:500}
+.err{color:var(--warn);font-size:14px;margin:0}
+.stats{display:flex;flex-wrap:wrap;gap:8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h3{font:700 16px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;margin:0}
+.publishbar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:5}
+.publishbar span{font-weight:600}
+.publishbar .ghost{color:var(--bg);opacity:.8}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog form{padding:20px;display:flex;flex-direction:column;gap:14px}
+dialog h2{font:700 24px/1 var(--display);text-transform:uppercase;margin:0}
+fieldset{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+legend{font:700 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding:0;margin-bottom:8px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+label.full{grid-column:1/-1}
+fieldset.rep{display:flex;flex-direction:column;gap:8px}
+.replist{display:flex;flex-direction:column;gap:8px}
+.rrow{display:grid;gap:6px;align-items:end;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.rrow.wi{grid-template-columns:1.3fr 1.1fr .9fr .9fr auto}
+.rrow.div{grid-template-columns:1.1fr 1.2fr 1.1fr .9fr auto}
+.rrow.div.one{grid-template-columns:1.1fr 1.2fr .9fr auto}
+.seg{grid-column:1/-1;display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:8px;width:max-content;max-width:100%}
+.seg label{flex-direction:row;align-items:center;gap:6px;padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:14px;font-weight:600}
+.seg input{width:auto;accent-color:var(--accent)}
+.seg label:has(input:checked){background:var(--surface);color:var(--ink)}
+a.booklink{color:var(--accent);font-weight:600}
+.rrow label{font-size:12px}
+.rrow .x{padding:8px 10px;align-self:end}
+.addline{align-self:flex-start;background:transparent;border-style:dashed;color:var(--accent)}
+.wilist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
+.style-tag{font:700 11px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:4px;background:var(--sunk);color:var(--ink);white-space:nowrap}
+.confirm{display:flex;gap:8px;align-items:center;color:var(--warn);font-size:14px;flex-wrap:wrap}
+@media (max-width:600px){
+  summary{grid-template-columns:56px 1fr}
+  .chips{grid-column:2;flex-direction:row;flex-wrap:wrap;align-items:flex-start}
+  .teamadd{grid-template-columns:1fr 1fr 1fr}
+  .teamadd input[name="name"]{grid-column:1/-1}
+td select.gr{width:90px;padding:5px 8px}
+td input.age{width:64px;padding:5px 8px}
+  .teamadd button{grid-column:1/-1}
+  .compose{grid-template-columns:1fr}
+  .rrow.wi{grid-template-columns:1fr 1fr}
+  .rrow.wi label:first-child,.rrow.wi label:nth-child(2){grid-column:1/-1}
+  .rrow.wi .x{grid-column:1/-1;justify-self:end}
+  .rrow.div{grid-template-columns:1fr 1fr}
+  .rrow.div .x{grid-column:1/-1;justify-self:end}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- Site theme overrides ---- */
+.coachgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-bottom:0;border-right:0}
+.coachcell{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-weight:600;font-size:14px;min-width:0}
+.coachcell span{overflow-wrap:anywhere}
+@media (max-width:600px){.coachgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.notes{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;width:100%;max-width:none}
+.notes-edit{resize:vertical;min-height:90px;width:100%!important;max-width:none;display:block;box-sizing:border-box}
+#f_notes{width:100%;display:block;min-height:90px;resize:vertical}
+.addline-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.addline-form input{flex:1 1 180px;width:auto}
+.coach{display:inline-flex;align-items:center;gap:2px}
+.x-chip{padding:0 0 0 6px!important;color:var(--muted)!important;font-size:12px!important}
+.x-chip:hover{color:var(--accent)!important}
+.titlerow{display:flex;align-items:center;gap:14px}
+.titletext{min-width:0}
+.titletext h1{margin-top:6px}
+.mark-icon{height:calc(12px + 6px + clamp(38px,8vw,60px) * .95);width:auto;flex:none;display:block}
+.brandbar{background:#000;border-bottom:1px solid var(--line);padding-inline:16px;padding-block:14px;display:flex;align-items:center;justify-content:center}
+.brandbar img{height:44px;width:auto;display:block}
+button,.pill,details.t,.tablewrap,dialog,input,select,textarea,.date,.rolebar,.card,.emptystate,.msg,.coach,.badge,.mark,.rrow,.tabs,.tabs button,.seg,.seg label,.affil{border-radius:0!important}
+h1{font-family:var(--display);font-weight:800;letter-spacing:0;font-size:clamp(38px,8vw,60px);line-height:.95}
+.eyebrow{font:600 12px/1 var(--display);letter-spacing:.12em;color:var(--accent)}
+button{font:700 14px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:11px 16px}
+button.primary{background:var(--accent);border-color:var(--accent)}
+button.primary:hover{background:#D90000;border-color:#D90000}
+button:not(.primary):not(.ghost){background:transparent;border-color:var(--ink);color:var(--ink)}
+button:not(.primary):not(.ghost):hover{background:var(--ink);color:var(--bg)}
+button.ghost{font:600 12px/1 var(--body);letter-spacing:.04em;text-transform:none}
+.tabs{background:transparent;border:1px solid var(--line);padding:0;gap:0}
+.tabs button{border:0!important;background:transparent!important;color:var(--muted)!important;padding:10px 16px}
+.tabs button[aria-pressed="true"]{background:var(--accent)!important;color:#fff!important;box-shadow:none}
+details.t{background:var(--surface);border-color:var(--line)}
+details.t[open]{border-color:var(--accent)}
+.tname{font-weight:800;font-size:26px;letter-spacing:.01em}
+.date .d{font-weight:800;font-size:32px}
+.month h2,.panel h3,legend,.card h3{font-family:var(--display);font-weight:700}
+.month h2{color:var(--accent);font-size:16px}
+.panel h3{color:var(--ink);font-size:16px}
+th{background:var(--sunk);font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.1em}
+.pill{font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
+.pill.ok{background:var(--sunk);color:var(--ink)}
+.mark.yes{background:var(--sunk);color:#fff}
+.mark.no{background:var(--accent);color:#fff}
+.badge{font-family:var(--display);font-size:12px}
+.rolebar,.rolebar.member{background:var(--panel);border:1px solid var(--panel-line)}
+input,select,textarea{background:var(--bg);border-color:var(--line);color:var(--ink)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
+dialog{background:var(--panel);border-color:var(--panel-line)}
+dialog input,dialog select,dialog textarea{background:#2A2A2E;border-color:var(--panel-line)}
+dialog .rrow{background:#34343A;border-color:var(--panel-line)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h2{font-weight:800;font-size:30px}
+.rrow{background:var(--bg)}
+.publishbar{background:#000;color:#fff;border-top:2px solid var(--accent)}
+.publishbar .ghost{color:#fff}
+.style-tag{background:var(--accent);color:#fff;font-family:var(--display);font-size:12px}
+a.booklink{color:var(--accent)}
+.emptystate{background:var(--panel);border:1px solid var(--panel-line)}
+.emptystate h2{font-weight:800;font-size:30px}
+
+/* ---- Card layout: Event left, Hotel right, red headings ---- */
+details.t > .body{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:640px){details.t > .body{grid-template-columns:1fr}}
+.box{background:#FFFFFF;border:1px solid #D4D4D8;padding:14px 16px;flex:1}
+.msgs.box{gap:0;padding:4px 16px}
+details.t > .body .msgs.box .msg{background:transparent;padding:10px 0;border-bottom:1px solid #E4E4E7}
+details.t > .body .msgs.box .msg:last-child{border-bottom:0}
+/* ---- Team Roster tab: white entry boxes and white table rows, grey heading row ---- */
+.teamview #teamAdd input,.teamview #teamAdd select{background:#FFFFFF;border-color:#C9C9CE;color:#141416;color-scheme:light}
+.teamview #teamAdd input::placeholder{color:#8A8A90}
+.teamview .affil{background:#FFFFFF;border-color:#C9C9CE}
+.teamview .affil-l{color:#5F5F66}
+.teamview .affil label.inline{color:#141416}
+.teamview .tablewrap{background:#FFFFFF;border-color:#D4D4D8}
+.teamview td{background:#FFFFFF;color:#141416;border-bottom-color:#E4E4E7}
+.teamview th{background:#ECECEE;color:#141416;border-bottom-color:#D4D4D8}
+.teamview th,.teamview th *{color:#141416}
+.teamview th button.sortbtn,.teamview th button.sortbtn.on{color:#141416!important;background:transparent!important;border:0!important;padding:0!important}
+.teamview th button.sortbtn .arrow{color:#141416}
+.teamview th button.sortbtn.on .arrow{color:#FF0D0D}
+.teamview th button.sortbtn:hover,.teamview th button.sortbtn:hover *{color:#FF0D0D!important;background:transparent!important;opacity:1}
+.teamview td input,.teamview td select{background:#FFFFFF;border-color:#C9C9CE;color:#141416;color-scheme:light}
+.teamview tr.editing td{background:#FDE2E2}
+.teamview .mark.yes{background:#E4E4E7;color:#141416}
+.teamview td button.ghost{color:#5F5F66}
+.teamview td button.ghost:hover{color:#141416}
+.teamview td button:not(.primary):not(.ghost){border-color:#141416;color:#141416;background:#FFFFFF}
+.teamview td button:not(.primary):not(.ghost):hover{background:#141416;color:#FFFFFF}
+/* ---- Wrestling style picker and header tags ---- */
+.namerow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.namefield{flex:1 1 260px}
+.stylepick{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--panel-line);background:#2A2A2E}
+.stylepick-l{font:600 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stylepick label.inline{color:var(--ink);font-size:14px}
+.stylepick input{width:auto}
+.tstyles{display:inline-flex;gap:6px;flex-wrap:wrap;vertical-align:middle;margin-left:10px;position:relative;top:-2px}
+.tstyles .style-tag{font-size:11px;padding:3px 6px;letter-spacing:.08em}
+.affil-note{margin:0;padding:12px 16px;background:#111113;border:0;border-left:5px solid #FF0D0D;color:#FFFFFF;font-size:14px;font-weight:500;line-height:1.55;display:flex;gap:12px;align-items:flex-start}
+.affil-ico{width:22px;height:22px;flex:none;margin-top:1px}
+.affil-note .code{font-weight:700;letter-spacing:.04em;white-space:nowrap;user-select:all;color:#FFFFFF;background:rgba(255,255,255,.12);padding:1px 6px}
+.sortbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+.sortbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sortbtn .arrow{font-size:10px;opacity:.45}
+.sortbtn.on{color:#141416}
+.sortbtn.on .arrow{opacity:1;color:#FF0D0D}
+.sortbtn .sortsub{font-size:10px;opacity:.7;text-transform:none;letter-spacing:0}
+/* ---- Self-hosted additions ---- */
+.savebar{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:8px;padding:9px 14px;background:#000;color:#fff;border:1px solid #3A3A3E;font:600 13px/1.3 var(--body);max-width:min(460px,calc(100vw - 32px))}
+.savebar .savedot{width:8px;height:8px;flex:none;background:#8A8A90}
+.savebar.saving .savedot{background:#FFFFFF}
+.savebar.saved .savedot{background:#4CC27A}
+.savebar.error{border-color:#FF0D0D}
+.savebar.error .savedot{background:#FF0D0D}
+.signin{display:flex;flex-wrap:wrap;gap:8px;align-items:center;flex:1 1 320px;justify-content:flex-end}
+.signin input{flex:1 1 200px;width:auto;max-width:280px}
+.signin-link{color:var(--muted);font:600 12px/1 var(--body);text-decoration:none;padding:6px 8px}
+.signin-link:hover{color:var(--ink)}
+html.embed .wrap{padding-block:8px 24px}
+.signin-msg{flex-basis:100%;margin:0;text-align:right;color:var(--muted);font-size:13px}
+/* ---- Light theme inside an opened tournament card (header stays dark) ---- */
+details.t > .body{
+  --bg:#F4F4F5; --surface:#FFFFFF; --sunk:#ECECEE; --line:#D4D4D8; --panel:#FFFFFF; --panel-line:#D4D4D8;
+  --ink:#141416; --muted:#5F5F66; --ok:#141416; --ok-bg:#E4E4E7; --warn:#D10000; --warn-bg:#FDE2E2;
+  background:#F4F4F5; color:var(--ink); color-scheme:light;
+  border-top:1px solid #3A3A3E;
+}
+details.t > .body .mark.yes{background:#E4E4E7;color:#141416}
+details.t > .body .mark.no{background:#FF0D0D;color:#fff}
+details.t > .body .pill.ok{background:#E4E4E7;color:#141416}
+details.t > .body input,details.t > .body select,details.t > .body textarea{background:#FFFFFF;border-color:#C9C9CE;color:#141416}
+details.t > .body input::placeholder,details.t > .body textarea::placeholder{color:#8A8A90}
+details.t > .body .tablewrap{background:#FFFFFF}
+details.t > .body .msg{background:#ECECEE}
+details.t > .body .coachgrid,details.t > .body .coachcell{background:#FFFFFF}
+details.t > .body button:not(.primary):not(.ghost){border-color:#141416;color:#141416}
+details.t > .body button:not(.primary):not(.ghost):hover{background:#141416;color:#fff}
+details.t > .body button.ghost{color:#5F5F66}
+details.t > .body button.ghost:hover{color:#141416}
+details.t > .body .x-chip:hover{color:#FF0D0D!important}
+details.t > .body .panel h3{color:#FF0D0D}
+details.t > .body .panel h3 .status{color:#5F5F66}
+details.t > .body .panel h3 button.ghost{color:#5F5F66}
+details.t > .body a.booklink{color:#D10000}
+</style>
+</head>
+<body>
+<div id="app" class="wrap">
+  <div class="rolebar member" id="rolebar"></div>
+  <header>
+    <div>
+      <div class="titlerow">
+        <img class="mark-icon" src="data:image/png;base64,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" alt="Mission Athletics" width="156" height="180">
+        <div class="titletext"><div class="eyebrow">Mission Athletics Wrestling</div>
+        <h1>Tournament Calendar</h1></div>
+      </div>
+      <p class="sub" id="subline"></p>
+    </div>
+    <button class="primary" id="addBtn" hidden>+ Add tournament</button>
+  </header>
+  <div class="toolbar">
+    <div class="tabs" role="group" aria-label="Section" id="sectionTabs" hidden>
+      <button id="secSched" aria-pressed="true">Schedule</button>
+      <button id="secTeam" aria-pressed="false">Team roster</button>
+    </div>
+    <div class="tabs" role="group" aria-label="Filter" id="filterTabs">
+      <button id="tabUp" aria-pressed="true">Upcoming</button>
+      <button id="tabPast" aria-pressed="false">Past</button>
+      <button id="tabAll" aria-pressed="false">All</button>
+    </div>
+  </div>
+  <main id="list"><div class="emptystate"><h2>Loading schedule</h2><p>Getting the latest tournaments.</p></div></main>
+</div>
+
+<div class="savebar" id="saveBar" hidden role="status" aria-live="polite"><span class="savedot"></span><span id="saveText">All changes saved</span></div>
+
+<dialog id="dlg">
+  <form id="form">
+    <h2 id="dlgTitle">Add tournament</h2>
+    <fieldset>
+      <legend>Event</legend>
+      <div class="namerow full">
+        <label class="namefield">Tournament name<input id="f_name" required placeholder="e.g. Iowa AAU State Freestyle"></label>
+        <div class="stylepick" role="group" aria-label="Wrestling style">
+          <span class="stylepick-l">Style</span>
+          <label class="inline"><input type="checkbox" name="sty" id="sty_folk" value="Folkstyle"> Folkstyle</label>
+          <label class="inline"><input type="checkbox" name="sty" id="sty_free" value="Freestyle"> Freestyle</label>
+          <label class="inline"><input type="checkbox" name="sty" id="sty_greco" value="Greco"> Greco</label>
+        </div>
+      </div>
+      <label class="full">Location<input id="f_venue" placeholder="Arena, school or event center"></label>
+      <label class="full">Address<input id="f_addr" placeholder="Street address"></label>
+      <label>City<input id="f_city" placeholder="Des Moines"></label>
+      <label>State<input id="f_state" placeholder="IA" maxlength="2" style="text-transform:uppercase"></label>
+      <div class="seg" role="radiogroup" aria-label="Tournament length">
+        <label><input type="radio" name="len" id="len1" value="one" checked> One day</label>
+        <label><input type="radio" name="len" id="lenM" value="multi"> Multiple days</label>
+      </div>
+      <label>Tournament Start Date<input id="f_date" type="date" required></label>
+      <label id="endWrap" hidden>End Date<input id="f_end" type="date"></label>
+    </fieldset>
+    <fieldset>
+      <legend>Event Notes</legend>
+      <label class="full"><span hidden>Event notes</span><textarea id="f_notes" rows="3" placeholder="Parking, entry fees, spectator admission, what to bring, bracket links…"></textarea></label>
+    </fieldset>
+    <fieldset class="rep">
+      <legend>Weigh-ins</legend>
+      <div class="replist" id="wiList"></div>
+      <button type="button" class="addline" id="addWi">+ Add another weigh-in time</button>
+    </fieldset>
+    <fieldset class="rep" id="divSet" hidden>
+      <legend>Divisions</legend>
+      <div class="replist" id="divList"></div>
+      <button type="button" class="addline" id="addDiv">+ Add division</button>
+    </fieldset>
+    <fieldset>
+      <legend>Hotel</legend>
+      <label class="full">Hotel name<input id="f_hotel"></label>
+      <label class="full">Hotel address<input id="f_haddr"></label>
+      <label>Phone<input id="f_hphone"></label>
+      <label>Reservation Deadline<input id="f_hdead" type="date"></label>
+      <label class="full">Reservation link<input id="f_hlink" type="url" placeholder="https://… hotel block booking page"></label>
+      <label class="full">Room notes (admins only)<input id="f_hnotes" placeholder="Block of 6 rooms under Mission Athletics, release date 10/20"></label>
+    </fieldset>
+    <div class="actions">
+      <span class="confirm" id="delConfirm" hidden>Delete this tournament? <button type="button" id="delYes" class="danger">Delete</button><button type="button" id="delNo">Keep</button></span>
+      <button type="button" class="ghost danger" id="delBtn" hidden>Delete tournament</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+      <button type="submit" class="primary">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  const CFG = window.MTC_CONFIG || {};
+  const configured = !!(window.supabase && CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && !/YOUR_/.test(CFG.SUPABASE_URL + CFG.SUPABASE_ANON_KEY));
+  const sb = configured ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+  // When shown inside the Webflow page, report height so the embed window fits the calendar
+  const EMBED = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
+  if (EMBED){
+    document.documentElement.classList.add("embed");
+    let lastH = 0;
+    const sendH = () => { const h = Math.ceil(document.documentElement.scrollHeight); if (Math.abs(h - lastH) > 1){ lastH = h; parent.postMessage({ type:"mtc-height", height:h }, "*"); } };
+    if (window.ResizeObserver) new ResizeObserver(sendH).observe(document.body);
+    window.addEventListener("load", sendH); document.addEventListener("toggle", sendH, true); setInterval(sendH, 1500);
+  }
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const rid = () => Math.random().toString(36).slice(2,10);
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const todayISO = (() => { const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); })();
+  const parts = iso => { const [y,m,d] = (iso||"").split("-").map(Number); return {y,m,d}; };
+  const shortDate = iso => { if(!iso) return ""; const p = parts(iso); return MONTHS[p.m-1]+" "+p.d; };
+  const fullDate = iso => { if (!iso) return "No date"; const p = parts(iso); return new Date(p.y,p.m-1,p.d).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}); };
+
+  // ---------- state ----------
+  let data = null;
+  let savedMap = { t:{}, w:{} };
+  let isAdmin = false, preview = false, userEmail = null, signinOpen = false, signinMsg = "";
+  let section = "schedule", filter = "up";
+  try { filter = localStorage.getItem("mtc_filter") || "up"; } catch(e){}
+  const openIds = new Set();
+  let editingId = null;
+  const canWrite = () => isAdmin && !preview;
+  const W = () => Object.fromEntries((data.wrestlers||[]).map(w => [w.id, w]));
+  function change(fn){ fn(data); render(); queueSave(); }
+
+  // ---------- load / save (Supabase) ----------
+  const listOf = k => k === "t" ? data.tournaments : data.wrestlers;
+  const TABLE = { t:"tournaments", w:"wrestlers" };
+  function snapshot(){
+    savedMap = { t:{}, w:{} };
+    for (const k of ["t","w"]) for (const x of listOf(k)) savedMap[k][x.id] = JSON.stringify(x);
+  }
+  async function loadAll(){
+    const [t, w] = await Promise.all([ sb.from("tournaments").select("id,data"), sb.from("wrestlers").select("id,data") ]);
+    if (t.error) throw t.error; if (w.error) throw w.error;
+    data = {
+      tournaments: t.data.map(r => Object.assign({}, r.data, { id:r.id })),
+      wrestlers: w.data.map(r => Object.assign({}, r.data, { id:r.id }))
+    };
+    snapshot();
+  }
+  let saveTimer = null, saving = false, saveAgain = false, saveState = "saved";
+  function showSave(state, text){
+    saveState = state;
+    const bar = $("#saveBar"); if (!bar) return;
+    bar.hidden = !canWrite() && state === "saved";
+    bar.className = "savebar " + state;
+    $("#saveText").textContent = text;
+  }
+  function queueSave(){
+    if (!sb) return;
+    showSave("saving", "Saving…");
+    clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 500);
+  }
+  async function saveNow(){
+    if (saving){ saveAgain = true; return; }
+    saving = true;
+    try {
+      for (const k of ["t","w"]){
+        const list = listOf(k);
+        const cur = {}; for (const x of list) cur[x.id] = JSON.stringify(x);
+        const now = new Date().toISOString();
+        const ups = list.filter(x => savedMap[k][x.id] !== cur[x.id]).map(x => ({ id:x.id, data:x, updated_at:now }));
+        const dels = Object.keys(savedMap[k]).filter(id => !(id in cur));
+        if (ups.length){
+          const r = await sb.from(TABLE[k]).upsert(ups).select("id");
+          if (r.error) throw r.error;
+          if ((r.data||[]).length < ups.length) throw { message:"not allowed" };
+          ups.forEach(u => { savedMap[k][u.id] = cur[u.id]; });
+        }
+        if (dels.length){
+          const r = await sb.from(TABLE[k]).delete().in("id", dels);
+          if (r.error) throw r.error;
+          dels.forEach(id => { delete savedMap[k][id]; });
+        }
+      }
+      showSave("saved", "All changes saved");
+    } catch(e){
+      console.warn(e);
+      const denied = /not allowed|row-level security|permission|JWT/i.test((e && (e.message||e.code)) || "");
+      if (denied){ showSave("error", "Couldn't save. Your sign-in may have expired, or this email isn't on the coach list. Sign out and back in."); }
+      else { showSave("error", "Couldn't save. Check your connection. Retrying…"); clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 5000); }
+    } finally {
+      saving = false;
+      if (saveAgain){ saveAgain = false; saveNow(); }
+    }
+  }
+  window.addEventListener("beforeunload", e => { if (saveState === "saving" || saveState === "error"){ e.preventDefault(); e.returnValue = ""; } });
+
+  // live updates from other coaches
+  let pendingRender = false;
+  const busy = () => { const a = document.activeElement; return ($("#dlg") && $("#dlg").open) || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest("#list")); };
+  function safeRender(){ if (busy()) pendingRender = true; else render(); }
+  document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !busy()){ pendingRender = false; render(); } }, 0));
+  function applyRemote(k, p){
+    if (!data) return;
+    const list = listOf(k);
+    if (p.eventType === "DELETE"){
+      const id = p.old && p.old.id; if (!id) return;
+      const i = list.findIndex(x => x.id === id);
+      if (i >= 0 && JSON.stringify(list[i]) !== savedMap[k][id]) return; // local edits win
+      if (i >= 0) list.splice(i, 1);
+      delete savedMap[k][id];
+    } else {
+      const row = p.new; if (!row || !row.id) return;
+      const obj = Object.assign({}, row.data, { id:row.id });
+      const i = list.findIndex(x => x.id === row.id);
+      if (i >= 0 && JSON.stringify(list[i]) !== savedMap[k][row.id]) return; // local edits not saved yet
+      if (i >= 0) list[i] = obj; else list.push(obj);
+      savedMap[k][row.id] = JSON.stringify(obj);
+    }
+    safeRender();
+  }
+
+  // ---------- coach sign-in ----------
+  async function refreshRole(){
+    if (!sb) return;
+    const { data:{ session } } = await sb.auth.getSession();
+    userEmail = session && session.user ? session.user.email : null;
+    isAdmin = false;
+    if (session){
+      const r = await sb.rpc("is_coach");
+      isAdmin = !r.error && r.data === true;
+    }
+    render();
+  }
+  async function sendLink(email){
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:true } });
+    signinMsg = error ? ("Couldn't send the link: " + error.message) : ("Check " + email + " for a sign-in link. Open it on this device.");
+    render();
+  }
+
+  // ---------- role / chrome ----------
+  function renderChrome(){
+    const bar = $("#rolebar");
+    if (isAdmin){
+      bar.className = "rolebar";
+      bar.innerHTML = `<div class="role"><span class="badge ${preview?"member":""}">${preview?"Member preview":"Admin"}</span><span class="hint">${preview?"This is what families see. Nothing is editable.":"Signed in as " + esc(userEmail) + ". Changes save automatically."}</span></div>
+        <div class="rowtools"><button id="previewBtn">${preview?"Back to admin":"Preview member view"}</button><button class="ghost" id="signOutBtn">Sign out</button></div>`;
+      $("#previewBtn").onclick = () => { preview = !preview; if (preview) section = "schedule"; render(); };
+    } else if (userEmail){
+      bar.className = "rolebar member";
+      bar.innerHTML = `<div class="role"><span class="badge member">Team view</span><span class="hint">Signed in as ${esc(userEmail)}, which isn't on the coach list yet. Ask George to add it.</span></div><button class="ghost" id="signOutBtn">Sign out</button>`;
+    } else {
+      bar.className = "rolebar member";
+      bar.innerHTML = `<div class="role"><span class="badge member">Team view</span><span class="hint">Read only. Contact a coach to change details.</span></div>
+        ${sb && EMBED ? `<a class="ghost signin-link" href="${esc(location.origin + location.pathname)}" target="_blank" rel="noopener">Coach sign in ↗</a>` : ""}
+        ${sb && !EMBED ? (signinOpen ? `<form class="signin" id="signinForm"><input type="email" id="signinEmail" placeholder="Coach email" autocomplete="email" required aria-label="Coach email"><button type="submit" class="primary">Email me a sign-in link</button><button type="button" class="ghost" id="signinCancel">Cancel</button>${signinMsg?`<p class="signin-msg">${esc(signinMsg)}</p>`:""}</form>` : `<button class="ghost" id="signinOpen">Coach sign in</button>`) : ""}`;
+      const o = $("#signinOpen"); if (o) o.onclick = () => { signinOpen = true; signinMsg = ""; render(); setTimeout(() => { const i = $("#signinEmail"); if (i) i.focus(); }); };
+      const c = $("#signinCancel"); if (c) c.onclick = () => { signinOpen = false; render(); };
+      const f = $("#signinForm"); if (f) f.onsubmit = e => { e.preventDefault(); const em = $("#signinEmail").value.trim(); if (em) sendLink(em); };
+    }
+    const so = $("#signOutBtn"); if (so) so.onclick = async () => { await sb.auth.signOut(); preview = false; section = "schedule"; refreshRole(); };
+    $("#addBtn").hidden = !(canWrite() && section === "schedule");
+    $("#sectionTabs").hidden = !canWrite();
+    $("#filterTabs").hidden = section !== "schedule";
+    for (const [id,s] of [["#secSched","schedule"],["#secTeam","team"]]) $(id).setAttribute("aria-pressed", section===s);
+    for (const [id,f] of [["#tabUp","up"],["#tabPast","past"],["#tabAll","all"]]) $(id).setAttribute("aria-pressed", filter===f);
+    $("#subline").textContent = section==="team" ? "Every wrestler on the team with AAU and USA Wrestling card status. Tournament rosters are picked from this list."
+      : "Dates, travel, coaches, roster and team notes for every event we attend.";
+    $("#saveBar").hidden = !canWrite() && saveState === "saved";
+  }
+  $("#secSched").onclick = () => { section = "schedule"; render(); };
+  $("#secTeam").onclick = () => { section = "team"; render(); };
+  const setFilter = f => { filter = f; try { localStorage.setItem("mtc_filter", f); } catch(e){} render(); };
+  $("#tabUp").onclick = () => setFilter("up");
+  $("#tabPast").onclick = () => setFilter("past");
+  $("#tabAll").onclick = () => setFilter("all");
+
+  // ---------- render ----------
+  function syncCoachNames(){
+    let dl = document.getElementById("coachNames");
+    if (!dl){ dl = document.createElement("datalist"); dl.id = "coachNames"; document.body.append(dl); }
+    const names = [...new Set(data.tournaments.flatMap(t => t.coaches || []))].sort();
+    dl.innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+  }
+  function render(){
+    if (!data) return;
+    syncCoachNames();
+    renderChrome();
+    const list = $("#list");
+    list.querySelectorAll("details.t").forEach(d => { d.open ? openIds.add(d.dataset.id) : openIds.delete(d.dataset.id); });
+    if (canWrite() && section === "team") return renderTeam(list);
+    const ts = data.tournaments.slice().sort((a,b) => (a.date||"").localeCompare(b.date||""));
+    let shown = ts.filter(t => { const end = t.endDate || t.date || ""; return filter==="up" ? end >= todayISO : filter==="past" ? end < todayISO : true; });
+    if (filter === "past") shown.reverse();
+    if (!ts.length){
+      list.innerHTML = canWrite()
+        ? `<div class="emptystate"><h2>No tournaments yet</h2><p>Enter your wrestlers on the Team roster tab, then add tournaments here. Everything saves automatically.</p><div class="rowtools"><button id="goTeam">Enter wrestlers</button><button class="primary" id="emptyAdd">+ Add tournament</button></div></div>`
+        : `<div class="emptystate"><h2>No tournaments posted yet</h2><p>Your coaches haven't posted the schedule. Check back soon.</p></div>`;
+      const b = $("#emptyAdd"); if (b) b.onclick = () => openDialog(null);
+      const g = $("#goTeam"); if (g) g.onclick = () => { section = "team"; render(); };
+      return;
+    }
+    if (!shown.length){ list.innerHTML = `<div class="emptystate"><h2>Nothing here</h2><p>${filter==="up"?"No upcoming tournaments. Check Past for earlier events.":"No past tournaments yet."}</p></div>`; return; }
+    let html = "", last = "";
+    for (const t of shown){
+      const p = parts(t.date), key = p.y+"-"+p.m;
+      if (key !== last){ if (last) html += "</section>"; html += `<section class="month"><h2>${MONTHS_FULL[p.m-1]||"No date"} ${p.y||""}</h2>`; last = key; }
+      html += cardHTML(t);
+    }
+    list.innerHTML = html + "</section>";
+    list.querySelectorAll("details.t").forEach(wire);
+  }
+
+  const displayName = n => String(n||"");
+  const fmtTime = t => { if (!t) return ""; const [h,m] = t.split(":").map(Number); return ((h%12)||12) + ":" + String(m).padStart(2,"0") + (h<12?" AM":" PM"); };
+  const dayLabel = iso => { if (!iso) return ""; const p = parts(iso); return new Date(p.y,p.m-1,p.d).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); };
+  const safeUrl = u => { try { const x = new URL(String(u||"").trim()); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch(e){ return ""; } };
+  const cityState = t => [t.city, t.state].filter(Boolean).join(", ");
+  const mark = (v, label) => `<span class="mark ${v?"yes":"no"}" aria-label="${label} ${v?"current":"missing"}">${v?"✓":"Missing"}</span>`;
+
+  function cardHTML(t){
+    const w = canWrite(), wm = W();
+    const p = parts(t.date), multi = !!(t.multiDay && t.endDate && t.endDate !== t.date) || (t.multiDay === undefined && t.endDate && t.endDate !== t.date);
+    const en = (t.entries||[]).filter(e => wm[e.wid]).sort((a,b) => wm[a.wid].name.localeCompare(wm[b.wid].name));
+    const n = en.length, missA = en.filter(e => !wm[e.wid].aau).length, missU = en.filter(e => !wm[e.wid].usa).length;
+    const coaches = t.coaches || [];
+    const memPill = !n ? `<span class="pill n">Roster TBA</span>` : (missA||missU) ? `<span class="pill warn">${[missA?missA+" need AAU":"", missU?missU+" need USA":""].filter(Boolean).join(" · ")}</span>` : `<span class="pill ok">Cards all set</span>`;
+    const rows = en.map(e => { const x = wm[e.wid]; return `<tr data-wid="${esc(e.wid)}">
+      <td>${esc(displayName(x.name))}</td>
+      <td>${w ? `<input class="wt mono" data-act="ewt" value="${esc(e.weight ?? x.weight ?? "")}" aria-label="${esc(x.name)} weight at this event">` : `<span class="mono">${esc(e.weight || x.weight || "")}</span>`}</td>
+      <td class="c">${w ? `<input type="checkbox" data-act="flag" data-k="aau" ${x.aau?"checked":""} aria-label="${esc(x.name)} AAU">` : mark(x.aau,"AAU")}</td>
+      <td class="c">${w ? `<input type="checkbox" data-act="flag" data-k="usa" ${x.usa?"checked":""} aria-label="${esc(x.name)} USA Wrestling">` : mark(x.usa,"USA")}</td>
+      ${w ? `<td class="c"><button class="ghost" data-act="rm" aria-label="Remove ${esc(x.name)}">✕</button></td>` : ""}</tr>`; }).join("");
+    const entered = new Set(en.map(e => e.wid));
+    const avail = data.wrestlers.filter(x => !entered.has(x.id)).sort((a,b) => a.name.localeCompare(b.name));
+    const msgs = (t.messages||[]).slice().sort((a,b) => a.at - b.at);
+    const wis = (Array.isArray(t.weighins) ? t.weighins : []).slice().sort((a,b) => ((a.date||"")+(a.time||"")).localeCompare((b.date||"")+(b.time||"")));
+    const divs = (t.divisions||[]).slice().sort((a,b) => ((a.date||"")+(a.start||"")).localeCompare((b.date||"")+(b.start||"")));
+    return `<details class="t" data-id="${esc(t.id)}"${openIds.has(t.id)?" open":""}>
+      <summary>
+        <div class="date"><div class="m">${MONTHS[p.m-1]||""}</div><div class="d">${p.d||"–"}</div>${multi?`<div class="r">–${shortDate(t.endDate)}</div>`:""}</div>
+        <div style="min-width:0"><div class="tname">${esc(t.name||"Untitled tournament")}${(t.styles||[]).length?`<span class="tstyles">${t.styles.map(x=>`<span class="style-tag">${esc(x)}</span>`).join("")}</span>`:""}</div>
+          <div class="tmeta">${cityState(t)?`<span>${esc(cityState(t))}</span>`:""}${t.hotelName?`<span>Hotel: ${esc(t.hotelName)}</span>`:""}${t.hotelDeadline && t.hotelDeadline >= todayISO?`<span>Book hotel by ${esc(shortDate(t.hotelDeadline))}</span>`:""}</div></div>
+        <div class="chips"><span class="pill n">${n} wrestler${n===1?"":"s"}</span></div>
+      </summary>
+      <div class="body">
+        <div class="panel"><h3>Event ${w?`<button class="ghost" data-act="edit">Edit details</button>`:""}</h3>
+          <div class="box"><dl><dt>Dates</dt><dd>${esc(fullDate(t.date))}${multi?" – "+esc(fullDate(t.endDate)):""}</dd>
+            ${t.venue?`<dt>Location</dt><dd>${esc(t.venue)}</dd>`:""}
+            ${t.address?`<dt>Address</dt><dd>${esc(t.address)}</dd>`:""}${cityState(t)?`<dt>City</dt><dd>${esc(cityState(t))}</dd>`:""}
+            ${wis.length?`<dt>Weigh-ins</dt><dd><ul class="wilist">${wis.map(x => `<li>${x.division?`<strong>${esc(x.division)}</strong> · `:""}${esc(dayLabel(x.date))}${x.date?" · ":""}${esc(fmtTime(x.time))}${x.end?" – "+esc(fmtTime(x.end)):""}</li>`).join("")}</ul></dd>`:""}</dl></div></div>
+        <div class="panel"><h3>Hotel</h3>
+          <div class="box">${t.hotelName ? `<dl><dt>Hotel</dt><dd>${esc(t.hotelName)}</dd>
+            ${t.hotelAddress?`<dt>Address</dt><dd>${esc(t.hotelAddress)}</dd>`:""}
+            ${t.hotelPhone?`<dt>Phone</dt><dd class="mono">${esc(t.hotelPhone)}</dd>`:""}
+            ${t.hotelDeadline?`<dt>Book by</dt><dd><strong>${esc(fullDate(t.hotelDeadline))}</strong>${t.hotelDeadline < todayISO ? ' <span class="pill warn">Deadline passed</span>' : ""}</dd>`:""}
+            ${safeUrl(t.hotelLink)?`<dt>Reserve</dt><dd><a class="booklink" href="${esc(safeUrl(t.hotelLink))}" target="_blank" rel="noopener">Book a room ↗</a></dd>`:""}
+            ${w && t.hotelNotes?`<dt>Notes</dt><dd>${esc(t.hotelNotes)}</dd>`:""}</dl>` : `<p class="empty-note">No hotel block for this event.</p>`}</div></div>
+        ${(t.multiDay && divs.length)?`<div class="panel wide"><h3>Divisions <span class="status">${divs.length} session${divs.length===1?"":"s"}</span></h3>
+          <div class="tablewrap"><table><thead><tr><th>Style</th><th>Division</th><th>Day</th><th>Start time</th></tr></thead>
+          <tbody>${divs.map(d => `<tr><td><span class="style-tag">${esc(d.style||"–")}</span></td><td>${esc(d.division||"–")}</td><td>${esc(dayLabel(d.date))}</td><td class="mono">${esc(fmtTime(d.start))}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+        ${(w || (t.notes||"").trim())?`<div class="panel wide"><h3>Event Notes</h3>
+          ${w?`<textarea class="notes-edit" data-act="notes" rows="3" placeholder="Parking, entry fees, spectator admission, what to bring, bracket links…" aria-label="Event notes">${esc(t.notes||"")}</textarea>`:`<div class="box"><p class="notes">${esc(t.notes)}</p></div>`}</div>`:""}
+        ${(w || coaches.length)?`<div class="panel wide"><h3>Coach Roster <span class="status">${coaches.length} coach${coaches.length===1?"":"es"}</span></h3>
+          ${coaches.length?`<div class="coachgrid">${coaches.map((c,i)=>`<div class="coachcell"><span>${esc(c)}</span>${w?`<button class="ghost x-chip" data-act="rmcoach" data-i="${i}" aria-label="Remove ${esc(c)}">✕</button>`:""}</div>`).join("")}</div>`:`<p class="empty-note">No coaches added yet.</p>`}
+          ${w?`<form class="addline-form" data-act="addcoach"><input name="coach" list="coachNames" placeholder="Coach name" aria-label="Coach name" autocomplete="off" required><button type="submit">Add coach</button></form>`:""}</div>`:""}
+        ${!w?`<div class="panel wide"><p class="affil-note"><svg class="affil-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 1.5 21h21L12 2.5Z" fill="#FF0D0D"/><rect x="11" y="9" width="2" height="6.5" fill="#FFFFFF"/><rect x="11" y="17" width="2" height="2" fill="#FFFFFF"/></svg><span>Be sure to affiliate with Mission Athletics (AAU: <strong class="code">UNDVDTX7F</strong> | USA: <strong class="code">2500163802</strong>).<br>This is how we are able to track you at the tournament and guarantee a coach will be in your corner.</span></p></div>`:""}
+        <div class="panel wide"><h3>Team roster <span class="status">${n} entered · ${n-missA} AAU · ${n-missU} USA</span></h3>
+          ${n?`<div class="tablewrap"><table><thead><tr><th rowspan="2">Wrestler</th><th rowspan="2">Weight</th><th class="grp" colspan="2">Affiliated</th>${w?'<th rowspan="2" class="c"><span hidden>Remove</span></th>':""}</tr><tr><th class="c sub">AAU</th><th class="c sub">USA</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="empty-note">Roster not posted yet.</p>`}
+          ${w ? (data.wrestlers.length ? `<div class="rowtools">${avail.length ? `<select data-role="pick" aria-label="Add wrestler" style="flex:1;width:auto"><option value="">Add a wrestler from the team…</option>${avail.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.weight?" ("+esc(x.weight)+")":""}</option>`).join("")}</select><button data-act="add">Add</button><button data-act="addall">Add all ${avail.length}</button>` : `<span class="status">Everyone on the team is entered.</span>`}</div>` : "") +
+            `<form class="addline-form" data-act="newwr"><input name="wname" placeholder="New wrestler full name" aria-label="New wrestler name" autocomplete="off" required><input name="wwt" placeholder="Weight" aria-label="Weight" style="max-width:100px;flex:0 1 100px"><button type="submit">Add new wrestler</button></form>` : ""}</div>
+        <div class="panel wide"><h3>Messages from coaches</h3>
+          <div class="msgs${msgs.length ? " box" : ""}">${msgs.length ? msgs.map(m => `<div class="msg">${w?`<button class="ghost del" data-act="delmsg" data-mid="${esc(m.id)}">Delete</button>`:""}<span class="who">${esc(m.by||"Coach")}</span><span class="when">${m.at?esc(new Date(m.at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):""}</span><p>${esc(m.text)}</p></div>`).join("") : `<p class="empty-note">No messages from coaches yet.</p>`}</div>
+          ${w?`<form class="compose" data-act="post"><input name="by" placeholder="Your name" aria-label="Posted by" value="${esc((function(){try{return localStorage.getItem("mtc_name")||"";}catch(e){return "";}})())}"><textarea name="text" rows="2" placeholder="Departure time, carpools, gear, what to bring…" aria-label="Message" required></textarea><button type="submit" class="primary">Post</button></form>`:""}</div>
+      </div></details>`;
+  }
+
+  function wire(el){
+    const id = el.dataset.id;
+    el.addEventListener("toggle", () => { el.open ? openIds.add(id) : openIds.delete(id); });
+    if (!canWrite()) return;
+    const T = () => data.tournaments.find(x => x.id === id);
+    el.addEventListener("change", e => {
+      const x = e.target;
+      if (x.dataset.act === "notes"){ const v = x.value.trim(); if ((T().notes||"") !== v) change(() => { T().notes = v; }); return; }
+      const tr = x.closest("tr[data-wid]"); if (!tr) return;
+      const wid = tr.dataset.wid;
+      if (x.dataset.act === "flag") change(d => { d.wrestlers.find(w => w.id === wid)[x.dataset.k] = x.checked; });
+      if (x.dataset.act === "ewt") change(() => { const en = T().entries.find(en => en.wid === wid); if (en) en.weight = x.value.trim(); });
+    });
+    el.addEventListener("click", e => {
+      const b = e.target.closest("button[data-act]"); if (!b) return;
+      const t = T(); t.entries = t.entries || [];
+      if (b.dataset.act === "edit") openDialog(t);
+      if (b.dataset.act === "rm"){ const wid = b.closest("tr").dataset.wid; change(() => { t.entries = t.entries.filter(en => en.wid !== wid); }); }
+      if (b.dataset.act === "add"){ const wid = el.querySelector('select[data-role="pick"]').value; if (!wid) return; change(d => { t.entries.push({wid, weight:(d.wrestlers.find(w=>w.id===wid)||{}).weight||""}); }); }
+      if (b.dataset.act === "addall"){ const have = new Set(t.entries.map(en => en.wid)); change(d => { d.wrestlers.filter(w => !have.has(w.id)).forEach(w => t.entries.push({wid:w.id, weight:w.weight||""})); }); }
+      if (b.dataset.act === "rmcoach"){ const i = +b.dataset.i; change(() => { t.coaches = (t.coaches||[]).filter((_,k) => k !== i); }); }
+      if (b.dataset.act === "delmsg"){ const mid = b.dataset.mid; change(() => { t.messages = (t.messages||[]).filter(m => m.id !== mid); }); }
+    });
+    el.addEventListener("submit", e => {
+      e.preventDefault(); const f = e.target;
+      if (f.dataset.act === "addcoach"){
+        const name = f.coach.value.trim(); if (!name) return;
+        change(() => { const t = T(); t.coaches = t.coaches || []; if (!t.coaches.some(c => c.toLowerCase() === name.toLowerCase())) t.coaches.push(name); });
+        setTimeout(() => { const i = document.querySelector(`details.t[data-id="${CSS.escape(id)}"] form[data-act="addcoach"] input`); if (i) i.focus(); });
+        return;
+      }
+      if (f.dataset.act === "newwr"){
+        const name = f.wname.value.trim(); if (!name) return;
+        const weight = f.wwt.value.trim();
+        change(d => { const wid = rid(); d.wrestlers.push({id:wid, name, weight, age:"", grade:"", aau:false, usa:false}); const t = T(); t.entries = t.entries || []; t.entries.push({wid, weight}); });
+        setTimeout(() => { const i = document.querySelector(`details.t[data-id="${CSS.escape(id)}"] form[data-act="newwr"] input`); if (i) i.focus(); });
+        return;
+      }
+      if (f.dataset.act !== "post") return;
+      const text = f.text.value.trim(); if (!text) return;
+      const by = f.by.value.trim() || "Coach"; try { localStorage.setItem("mtc_name", by); } catch(e){}
+      change(() => { const t = T(); t.messages = t.messages || []; t.messages.push({id:rid(), text, by, at:Date.now()}); });
+    });
+  }
+
+  const GRADES = ["Pre-K","K","1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th","11th","12th"];
+  const gradeOptions = cur => `<option value="">Grade</option>` + GRADES.map(g => `<option value="${g}"${g===cur?" selected":""}>${g}</option>`).join("");
+  let editWid = null;
+  let teamSort = { key:"last", dir:1 };
+  try { const v = JSON.parse(localStorage.getItem("mtc_teamsort")||"null"); if (v && v.key) teamSort = v; } catch(e){}
+  const lastFirst = n => { const p = String(n||"").trim().toLowerCase().split(/\s+/); return (p.length > 1 ? p[p.length-1] + " " + p.slice(0,-1).join(" ") : p[0] || ""); };
+  const numOrNull = v => { const m = String(v||"").match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  function teamSorter(){
+    const {key, dir} = teamSort;
+    const val = w => key === "last" ? lastFirst(w.name)
+      : key === "weight" ? numOrNull(w.weight)
+      : key === "age" ? numOrNull(w.age)
+      : (GRADES.indexOf(w.grade) >= 0 ? GRADES.indexOf(w.grade) : null);
+    return (a,b) => {
+      const va = val(a), vb = val(b);
+      if (va === null && vb === null) return lastFirst(a.name).localeCompare(lastFirst(b.name));
+      if (va === null) return 1; if (vb === null) return -1;   // blanks always last
+      const c = typeof va === "string" ? va.localeCompare(vb) : va - vb;
+      return c !== 0 ? c * dir : lastFirst(a.name).localeCompare(lastFirst(b.name));
+    };
+  }
+  const sortHead = (key, label) => {
+    const on = teamSort.key === key;
+    return `<button type="button" class="sortbtn${on?" on":""}" data-sort="${key}" aria-label="Sort by ${label}${key==="last"?" last name":""}">${label}${key==="last"?' <span class="sortsub">(last)</span>':""}<span class="arrow">${on ? (teamSort.dir === 1 ? "▲" : "▼") : "↕"}</span></button>`;
+  };
+  function renderTeam(list){
+    const ws = data.wrestlers.slice().sort(teamSorter());
+    const nA = ws.filter(w => w.aau).length, nU = ws.filter(w => w.usa).length;
+    list.innerHTML = `<div class="panel teamview">
+      <div class="stats"><span class="pill n">${ws.length} wrestlers</span><span class="pill ${nA===ws.length?"ok":"warn"}">${nA}/${ws.length} AAU</span><span class="pill ${nU===ws.length?"ok":"warn"}">${nU}/${ws.length} USA</span></div>
+      <form class="teamadd" id="teamAdd">
+        <input name="name" placeholder="Wrestler full name" aria-label="Wrestler name" required>
+        <input name="weight" placeholder="Weight" aria-label="Weight class">
+        <input name="age" type="number" min="3" max="25" placeholder="Age" aria-label="Age">
+        <select name="grade" aria-label="Grade">${gradeOptions("")}</select>
+        <div class="affil" role="group" aria-label="Affiliated"><span class="affil-l">Affiliated</span>
+          <label class="inline"><input type="checkbox" name="aau"> AAU</label>
+          <label class="inline"><input type="checkbox" name="usa"> USA</label></div>
+        <button type="submit" class="primary">Add wrestler</button>
+      </form>
+      ${ws.length ? `<div class="tablewrap"><table><thead><tr><th rowspan="2">${sortHead("last","Wrestler")}</th><th rowspan="2">${sortHead("weight","Weight")}</th><th rowspan="2">${sortHead("age","Age")}</th><th rowspan="2">${sortHead("grade","Grade")}</th><th class="grp" colspan="2">Affiliated</th><th rowspan="2" class="c"><span hidden>Actions</span></th></tr><tr><th class="c sub">AAU</th><th class="c sub">USA</th></tr></thead>
+      <tbody>${ws.map(w => w.id === editWid ? `<tr data-wid="${esc(w.id)}" class="editing">
+        <td><input id="ew_name" data-k="name" value="${esc(w.name)}" aria-label="Wrestler name" style="min-width:160px"></td>
+        <td><input id="ew_weight" class="wt mono" data-k="weight" value="${esc(w.weight||"")}" aria-label="Weight"></td>
+        <td><input id="ew_age" class="age mono" type="number" min="3" max="25" data-k="age" value="${esc(w.age||"")}" aria-label="Age"></td>
+        <td><select id="ew_grade" class="gr" data-k="grade" aria-label="Grade">${gradeOptions(w.grade||"")}</select></td>
+        <td class="c"><input id="ew_aau" type="checkbox" data-k="aau" ${w.aau?"checked":""} aria-label="AAU"></td>
+        <td class="c"><input id="ew_usa" type="checkbox" data-k="usa" ${w.usa?"checked":""} aria-label="USA Wrestling"></td>
+        <td class="c" style="white-space:nowrap"><button class="primary" data-act="savew" style="padding:7px 10px">Save</button> <button data-act="cancelw" style="padding:7px 10px">Cancel</button> <button class="ghost danger" data-act="rmw">Remove</button></td></tr>`
+      : `<tr data-wid="${esc(w.id)}"><td>${esc(w.name)}</td>
+        <td class="mono">${esc(w.weight||"")}</td><td class="mono">${esc(w.age||"")}</td><td>${esc(w.grade||"")}</td>
+        <td class="c">${mark(w.aau,"AAU")}</td><td class="c">${mark(w.usa,"USA")}</td>
+        <td class="c"><button class="ghost" data-act="editw" aria-label="Edit ${esc(w.name)}">Edit</button></td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="empty-note">No wrestlers yet. Add each athlete once; you'll pick from this list for every tournament.</p>`}
+    </div>`;
+    $("#teamAdd").addEventListener("submit", e => {
+      e.preventDefault(); const f = e.target; const name = f.name.value.trim(); if (!name) return;
+      change(d => d.wrestlers.push({id:rid(), name, weight:f.weight.value.trim(), age:f.age.value.trim(), grade:f.grade.value, aau:f.aau.checked, usa:f.usa.checked}));
+      setTimeout(() => { const n = document.querySelector('#teamAdd input[name="name"]'); if (n) n.focus(); });
+    });
+    list.querySelectorAll("button.sortbtn").forEach(b => b.addEventListener("click", () => {
+      const k = b.dataset.sort;
+      teamSort = teamSort.key === k ? { key:k, dir:-teamSort.dir } : { key:k, dir:1 };
+      try { localStorage.setItem("mtc_teamsort", JSON.stringify(teamSort)); } catch(e){}
+      render();
+    }));
+    list.querySelectorAll("tr[data-wid]").forEach(tr => {
+      const wid = tr.dataset.wid, wr = () => data.wrestlers.find(w => w.id === wid);
+      const save = () => {
+        const v = {}; tr.querySelectorAll("[data-k]").forEach(i => { v[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value.trim(); });
+        if (!v.name){ tr.querySelector("#ew_name").focus(); return; }
+        editWid = null; change(() => Object.assign(wr(), v));
+      };
+      tr.addEventListener("keydown", e => {
+        if (!tr.classList.contains("editing")) return;
+        if (e.key === "Enter" && e.target.tagName !== "BUTTON"){ e.preventDefault(); save(); }
+        if (e.key === "Escape"){ editWid = null; render(); }
+      });
+      tr.addEventListener("click", e => {
+        const b = e.target.closest("button[data-act]"); if (!b) return;
+        const act = b.dataset.act;
+        if (act === "editw"){ editWid = wid; render(); const n = document.getElementById("ew_name"); if (n) n.focus(); }
+        if (act === "cancelw"){ editWid = null; render(); }
+        if (act === "savew") save();
+        if (act === "rmw"){
+          if (b.dataset.confirm){ editWid = null; change(d => { d.wrestlers = d.wrestlers.filter(w => w.id !== wid); d.tournaments.forEach(t => t.entries = (t.entries||[]).filter(en => en.wid !== wid)); }); }
+          else { b.dataset.confirm = "1"; b.textContent = "Confirm remove"; }
+        }
+      });
+    });
+  }
+
+  // ---------- dialog ----------
+  const F = k => $("#f_"+k);
+  const fields = {name:"name",date:"date",end:"endDate",venue:"venue",addr:"address",city:"city",state:"state",hotel:"hotelName",haddr:"hotelAddress",hphone:"hotelPhone",hdead:"hotelDeadline",hlink:"hotelLink",hnotes:"hotelNotes",notes:"notes"};
+  function openDialog(t){
+    if (!canWrite()) return;
+    editingId = t ? t.id : null;
+    $("#dlgTitle").textContent = t ? "Edit tournament" : "Add tournament";
+    for (const [k,prop] of Object.entries(fields)) F(k).value = t ? (t[prop]||"") : "";
+    document.querySelectorAll('#dlg input[name="sty"]').forEach(c => { c.checked = !!(t && (t.styles||[]).includes(c.value)); });
+    const multi = !!(t && (t.multiDay || (t.endDate && t.endDate !== t.date)));
+    $(multi ? "#lenM" : "#len1").checked = true; applyLen();
+    $("#wiList").innerHTML = ""; $("#divList").innerHTML = "";
+    const wis = t && Array.isArray(t.weighins) ? t.weighins : [];
+    (wis.length ? wis : [{}]).forEach(addWiRow);
+    const divs = t && Array.isArray(t.divisions) ? t.divisions : [];
+    (divs.length ? divs : [{}]).forEach(addDivRow);
+    $("#delBtn").hidden = !t; $("#delConfirm").hidden = true;
+    $("#dlg").showModal();
+  }
+  const STYLES = ["Folkstyle","Freestyle","Greco"];
+  const AGES = ["6U","8U","10U","12U","16U","Junior"];
+  const opt = (v, cur, label) => `<option value="${esc(v)}"${v===cur?" selected":""}>${esc(label||v)}</option>`;
+  const divOptions = cur => `<option value="">Select…</option>${opt("Everyone", cur)}
+        <optgroup label="Boys">${AGES.map(a => opt("Boys "+a, cur)).join("")}</optgroup>
+        <optgroup label="Girls">${AGES.map(a => opt("Girls "+a, cur)).join("")}</optgroup>`;
+  const timeAttrs = 'type="text" data-time="1" list="timeList" inputmode="text" autocomplete="off" placeholder="6:00 PM"';
+  function parseTime(v){
+    v = String(v||"").trim().toLowerCase().replace(/\s+/g,"").replace(/\./g,"");
+    if (!v) return "";
+    const m = v.match(/^(\d{1,2})(?::?(\d{2}))?(a|am|p|pm)?$/);
+    if (!m) return null;
+    let h = +m[1], min = m[2] ? +m[2] : 0; const ap = m[3];
+    if (min > 59) return null;
+    if (ap){ if (h < 1 || h > 12) return null; if (ap[0]==="p" && h !== 12) h += 12; if (ap[0]==="a" && h === 12) h = 0; }
+    else if (h > 23) return null;
+    else if (!m[2] && h >= 1 && h <= 11 && h < 6) h += 12; // bare "5" reads as 5 PM
+    return String(h).padStart(2,"0") + ":" + String(min).padStart(2,"0");
+  }
+  (function buildTimeList(){
+    const dl = document.createElement("datalist"); dl.id = "timeList";
+    for (let mins = 5*60; mins < 24*60; mins += 15){
+      const o = document.createElement("option"); o.value = fmtTime(String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0")); dl.append(o);
+    }
+    document.body.append(dl);
+  })();
+  document.addEventListener("change", e => {
+    const i = e.target; if (!i.dataset || !i.dataset.time) return;
+    const p = parseTime(i.value);
+    if (p === null){ i.setCustomValidity("Enter a time like 6:00 PM"); i.reportValidity(); }
+    else { i.setCustomValidity(""); i.value = p ? fmtTime(p) : ""; }
+  });
+  let rowSeq = 0;
+  function addWiRow(w){
+    w = w || {}; const n = ++rowSeq;
+    const row = document.createElement("div"); row.className = "rrow wi";
+    row.innerHTML = `<label>Division<select id="wi_g${n}" data-k="division">${divOptions(w.division || "Everyone")}</select></label>
+      <label>Date<input type="date" id="wi_d${n}" data-k="date" value="${esc(w.date || F("date").value || "")}"></label>
+      <label>Start time<input ${timeAttrs} id="wi_t${n}" data-k="time" value="${esc(fmtTime(w.time))}"></label>
+      <label>End time<input ${timeAttrs} id="wi_e${n}" data-k="end" value="${esc(fmtTime(w.end))}"></label>
+      <button type="button" class="ghost x" aria-label="Remove weigh-in time">✕</button>`;
+    row.querySelector(".x").onclick = () => row.remove();
+    $("#wiList").append(row);
+  }
+  function addDivRow(d){
+    d = d || {}; const n = ++rowSeq;
+    const row = document.createElement("div"); row.className = "rrow div";
+    row.innerHTML = `<label>Style<select id="dv_s${n}" data-k="style"><option value="">Select…</option>${STYLES.map(s => opt(s, d.style)).join("")}</select></label>
+      <label>Division<select id="dv_g${n}" data-k="division">${divOptions(d.division)}</select></label>
+      <label>Date<input type="date" id="dv_d${n}" data-k="date" value="${esc(d.date || F("date").value || "")}"></label>
+      <label>Start time<input ${timeAttrs} id="dv_st${n}" data-k="start" value="${esc(fmtTime(d.start))}"></label>
+      <button type="button" class="ghost x" aria-label="Remove division">✕</button>`;
+    row.querySelector(".x").onclick = () => row.remove();
+    $("#divList").append(row);
+  }
+  const isMulti = () => $("#lenM").checked;
+  function applyLen(){
+    const m = isMulti();
+    $("#endWrap").hidden = !m; $("#divSet").hidden = !m;
+  }
+  $("#len1").addEventListener("change", applyLen);
+  $("#lenM").addEventListener("change", applyLen);
+  const readRows = sel => [...document.querySelectorAll(sel)].map(r => Object.fromEntries([...r.querySelectorAll("[data-k]")].map(i => [i.dataset.k, i.dataset.time ? (parseTime(i.value) || "") : i.value.trim()])));
+  $("#addWi").onclick = () => addWiRow({});
+  $("#addDiv").onclick = () => addDivRow({});
+  $("#addBtn").onclick = () => openDialog(null);
+  $("#cancelBtn").onclick = () => $("#dlg").close();
+  $("#delBtn").onclick = () => { $("#delConfirm").hidden = false; $("#delBtn").hidden = true; };
+  $("#delNo").onclick = () => { $("#delConfirm").hidden = true; $("#delBtn").hidden = false; };
+  $("#delYes").onclick = () => { change(d => { d.tournaments = d.tournaments.filter(t => t.id !== editingId); }); $("#dlg").close(); };
+  $("#form").addEventListener("submit", e => {
+    e.preventDefault();
+    const vals = {}; for (const [k,prop] of Object.entries(fields)) vals[prop] = F(k).value.trim();
+    const badTime = [...document.querySelectorAll("#dlg [data-time]")].find(i => parseTime(i.value) === null && !i.closest("[hidden]"));
+    if (badTime){ badTime.setCustomValidity("Enter a time like 6:00 PM"); badTime.reportValidity(); badTime.focus(); return; }
+    vals.styles = [...document.querySelectorAll('#dlg input[name="sty"]:checked')].map(c => c.value);
+    vals.multiDay = isMulti();
+    if (!vals.multiDay) vals.endDate = "";
+    vals.state = vals.state.toUpperCase();
+    vals.weighins = readRows("#wiList .rrow").filter(w => w.time);
+    vals.divisions = vals.multiDay ? readRows("#divList .rrow").filter(d => d.style || d.division) : [];
+    change(d => {
+      if (editingId){ const t = d.tournaments.find(t => t.id === editingId); Object.assign(t, vals); delete t.hotelConf; delete t.checkIn; delete t.checkOut; }
+      else { const id = rid(); d.tournaments.push({id, ...vals, entries:[], messages:[]}); openIds.add(id); }
+    });
+    $("#dlg").close();
+  });
+
+  // ---------- boot ----------
+  (async () => {
+    if (!sb){
+      $("#list").innerHTML = `<div class="emptystate"><h2>Not connected yet</h2><p>Add your Supabase Project URL and anon key to config.js, then reload this page.</p></div>`;
+      return;
+    }
+    try { await loadAll(); }
+    catch(e){
+      console.warn(e);
+      $("#list").innerHTML = `<div class="emptystate"><h2>Couldn't load the schedule</h2><p>Check your connection and reload the page. If this keeps happening, the Supabase project may be paused; open it in Supabase and click Resume.</p></div>`;
+      return;
+    }
+    render();
+    sb.auth.onAuthStateChange(() => { setTimeout(refreshRole, 0); });
+    await refreshRole();
+    sb.channel("mtc-live")
+      .on("postgres_changes", { event:"*", schema:"public", table:"tournaments" }, p => applyRemote("t", p))
+      .on("postgres_changes", { event:"*", schema:"public", table:"wrestlers" }, p => applyRemote("w", p))
+      .subscribe();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<!-- Mission Tournament Calendar: paste into a Webflow Embed element on the
+     hidden page missionathletics.com/wrestling-tournament-schedule. Ready to use as is. -->
+<iframe id="mtc-frame"
+  src="https://wrestlingtournaments.missionathletics.com/"
+  title="Wrestling Tournament Schedule"
+  style="display:block;width:100%;min-height:700px;border:0;background:#1C1C1E"
+  loading="eager"></iframe>
+<script>
+  window.addEventListener("message", function (e) {
+    if (e.origin !== "https://wrestlingtournaments.missionathletics.com") return;
+    if (e.data && e.data.type === "mtc-height") {
+      document.getElementById("mtc-frame").style.height = e.data.height + "px";
+    }
+  });
+</script>
