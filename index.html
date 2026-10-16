@@ -680,6 +680,13 @@ details.t > .body a.booklink{color:#D10000}
         ${w?`<td class="contact">${contactHTML(contacts[x.id])}</td><td class="c" style="white-space:nowrap"><button class="primary" data-act="sg-approve" style="padding:7px 10px">Approve</button> <button class="ghost danger" data-act="sg-remove">Remove</button></td>`:""}</tr>`).join("")}
       </tbody></table></div></div>`;
   }
+  // Email the coaches about a new sign-up through the Mission Gmail (Google Apps Script). Off when NOTIFY_URL is empty.
+  function notifySignup(t, row, contact){
+    const url = (CFG.NOTIFY_URL || "").trim(); if (!/^https:\/\/script\.google\.com\//.test(url)) return;
+    const body = { id: row.id, sport: "wrestling", tournament: t.name, date: fullDate(t.date), athlete: row.name, weight: row.weight,
+      division: row.division || "", aau: !!row.aau, usa: !!row.usa, parent: contact, page: location.origin + location.pathname };
+    try { fetch(url, { method:"POST", mode:"no-cors", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body), keepalive:true }).catch(e => console.warn("Coach email not sent", e)); } catch(e) { console.warn("Coach email not sent", e); }
+  }
   function signupHTML(t){
     const end = t.endDate || t.date || "";
     if (end && end < todayISO) return "";
@@ -820,6 +827,7 @@ details.t > .body a.booklink{color:#D10000}
       if (r.error){ btn.disabled = false; btn.textContent = "Send sign-up"; err("Couldn't send the sign-up. Check your connection and try again."); return; }
       const rc = await sb.from(CONTACTS).insert({ signup_id: row.id, contact });
       if (rc.error) console.warn("Contact not saved", rc.error);
+      notifySignup(t, row, contact);
       if (!signups.some(x => x.id === row.id)) signups.push(Object.assign({ created_at:new Date().toISOString() }, row));
       signupOpen.delete(id);
       signupMsg[id] = "Thanks! " + name + " is on the list as Pending until a coach confirms.";
