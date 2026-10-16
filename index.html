@@ -662,12 +662,17 @@ details.t > .body a.booklink{color:#D10000}
   const mark = (v, label) => `<span class="mark ${v?"yes":"no"}" aria-label="${label} ${v?"current":"missing"}">${v?"✓":"Missing"}</span>`;
 
   const pendingFor = t => signups.filter(x => x.tournament_id === t.id && x.status === "pending").sort((a,b) => String(a.created_at||"").localeCompare(String(b.created_at||"")));
+  function contactHTML(c){
+    if (!c) return '<span class="status">Not shared</span>';
+    const i = c.indexOf(" · ");
+    return i < 0 ? esc(c) : `<strong>${esc(c.slice(0, i))}</strong><br>${esc(c.slice(i + 3))}`;
+  }
   function pendingHTML(t, w){
     const ps = pendingFor(t); if (!ps.length) return "";
     return `<div class="pendbox"><div class="pendhead"><span class="pill warn">Pending</span><span>${ps.length} sign-up${ps.length===1?"":"s"} waiting for a coach to confirm</span></div>
-      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Weight</th><th>Division</th><th class="c">AAU</th><th class="c">USA</th>${w?'<th>Parent contact</th><th class="c"><span hidden>Actions</span></th>':""}</tr></thead><tbody>
+      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Weight</th><th>Division</th><th class="c">AAU</th><th class="c">USA</th>${w?'<th>Parent</th><th class="c"><span hidden>Actions</span></th>':""}</tr></thead><tbody>
       ${ps.map(x => `<tr class="pendrow" data-sid="${esc(x.id)}"><td>${esc(x.name)} <span class="pendtag">Pending</span></td><td class="mono">${esc(x.weight||"")}</td><td>${esc(x.division||"")}</td><td class="c">${mark(x.aau,"AAU")}</td><td class="c">${mark(x.usa,"USA")}</td>
-        ${w?`<td class="contact">${contacts[x.id] ? esc(contacts[x.id]) : '<span class="status">Not shared</span>'}</td><td class="c" style="white-space:nowrap"><button class="primary" data-act="sg-approve" style="padding:7px 10px">Approve</button> <button class="ghost danger" data-act="sg-remove">Remove</button></td>`:""}</tr>`).join("")}
+        ${w?`<td class="contact">${contactHTML(contacts[x.id])}</td><td class="c" style="white-space:nowrap"><button class="primary" data-act="sg-approve" style="padding:7px 10px">Approve</button> <button class="ghost danger" data-act="sg-remove">Remove</button></td>`:""}</tr>`).join("")}
       </tbody></table></div></div>`;
   }
   function signupHTML(t){
@@ -682,10 +687,11 @@ details.t > .body a.booklink{color:#D10000}
           <input name="sname" placeholder="Wrestler full name" aria-label="Wrestler full name" autocomplete="off" required>
           <input name="sweight" placeholder="Weight" aria-label="Weight" required>
           <select name="sdiv" aria-label="Division"><option value="">Division</option><optgroup label="Boys">${AGES.map(a => opt("Boys "+a, "")).join("")}</optgroup><optgroup label="Girls">${AGES.map(a => opt("Girls "+a, "")).join("")}</optgroup></select>
+          <input name="sparent" placeholder="Parent name" aria-label="Parent name" autocomplete="name" required>
           <input name="scontact" placeholder="Parent phone or email" aria-label="Parent phone or email" required>
         </div>
         <div class="signup-mem"><label class="inline"><input type="checkbox" name="saau"> AAU member</label><label class="inline"><input type="checkbox" name="susa"> USA Wrestling member</label></div>
-        <p class="status">A coach confirms each sign-up. Parent contact is only visible to coaches.</p>
+        <p class="status">A coach confirms each sign-up. Parent name and contact are only visible to coaches.</p>
         <p class="err signup-err" hidden></p>
         <div class="rowtools"><button type="submit" class="primary">Send sign-up</button><button type="button" class="ghost" data-act="signup-cancel">Cancel</button></div>
       </form>`;
@@ -787,10 +793,12 @@ details.t > .body a.booklink{color:#D10000}
       const chk = n => { const x = f.querySelector(`[name="${n}"]`); return !!(x && x.checked); };
       const err = m => { const x = f.querySelector(".signup-err"); x.textContent = m; x.hidden = !m; };
       const t = data.tournaments.find(x => x.id === id); if (!t) return;
-      const name = val("sname"), weight = val("sweight"), contact = val("scontact");
+      const name = val("sname"), weight = val("sweight"), parent = val("sparent"), phone = val("scontact");
       if (name.length < 2){ err("Enter the athlete's full name."); return; }
       if (!weight){ err("Enter a weight."); return; }
-      if (contact.length < 3){ err("Enter a parent phone number or email."); return; }
+      if (parent.length < 2){ err("Enter the parent's name."); return; }
+      if (phone.length < 3){ err("Enter a parent phone number or email."); return; }
+      const contact = (parent + " · " + phone).slice(0, 120);
       const wm = W();
       const already = (t.entries||[]).some(en => wm[en.wid] && normName(wm[en.wid].name) === normName(name)) || pendingFor(t).some(x => normName(x.name) === normName(name));
       if (already){ err(name + " is already on the list for this tournament."); return; }
