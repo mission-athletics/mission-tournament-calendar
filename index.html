@@ -280,6 +280,19 @@ details.t > .body .msgs.box .msg:last-child{border-bottom:0}
 .signin-link:hover{color:var(--ink)}
 html.embed .wrap{padding-block:8px 24px}
 .signin-msg{flex-basis:100%;margin:0;text-align:right;color:var(--muted);font-size:13px}
+/* ---- Self sign-up ---- */
+.pendbox{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.pendhead{display:flex;align-items:center;gap:8px;font-size:13px;color:#5F5F66}
+.pendrow td{background:#FFF8E6}
+.pendtag{display:inline-block;margin-left:6px;font:700 10px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;padding:3px 6px;background:#F2C700;color:#141416}
+td.contact{font-size:13px;overflow-wrap:anywhere}
+.signup-btn{align-self:flex-start}
+.signup-form{display:flex;flex-direction:column;gap:10px;background:#FFFFFF;border:1px solid #D4D4D8;border-top:4px solid #FF0D0D;padding:14px 16px}
+.signup-title{font:800 20px/1 var(--display);text-transform:uppercase;color:#141416}
+.signup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.signup-mem{display:flex;flex-wrap:wrap;gap:16px}
+.signup-mem label.inline{color:#141416}
+.signup-done{background:#FFFFFF;border:1px solid #D4D4D8;border-left:5px solid #2E9B48;padding:12px 14px;color:#141416;font-weight:600;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 /* ---- Light theme inside an opened tournament card (header stays dark) ---- */
 details.t > .body{
   --bg:#F4F4F5; --surface:#FFFFFF; --sunk:#ECECEE; --line:#D4D4D8; --panel:#FFFFFF; --panel-line:#D4D4D8;
@@ -423,6 +436,12 @@ details.t > .body a.booklink{color:#D10000}
   // ---------- state ----------
   let data = null;
   let savedMap = { t:{}, w:{} };
+  // Athlete self sign-ups (pending until a coach approves). Contacts are readable by coaches only.
+  const SIGNUPS = "signups", CONTACTS = "signup_contacts";
+  let signups = [], contacts = {};
+  const signupOpen = new Set(), signupMsg = {};
+  const uuid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === "x" ? r : (r&3|8)).toString(16); });
+  const normName = n => String(n||"").trim().toLowerCase().replace(/\s+/g," ");
   let isAdmin = false, preview = false, userEmail = null, signinOpen = false, signinMsg = "";
   let section = "schedule", filter = "up";
   try { filter = localStorage.getItem("mtc_filter") || "up"; } catch(e){}
@@ -447,6 +466,28 @@ details.t > .body a.booklink{color:#D10000}
       wrestlers: w.data.map(r => Object.assign({}, r.data, { id:r.id }))
     };
     snapshot();
+    const sg = await sb.from(SIGNUPS).select("*");
+    if (sg.error) { console.warn("Sign-ups unavailable:", sg.error.message || sg.error); signups = []; }
+    else signups = sg.data || [];
+  }
+  async function loadContacts(){
+    if (!sb || !isAdmin) { contacts = {}; return; }
+    const r = await sb.from(CONTACTS).select("signup_id,contact");
+    contacts = {};
+    if (!r.error) (r.data || []).forEach(c => { contacts[c.signup_id] = c.contact; });
+  }
+  let contactTimer = null;
+  function applySignup(p){
+    if (p.eventType === "DELETE"){
+      const id = p.old && p.old.id; if (!id) return;
+      signups = signups.filter(x => x.id !== id);
+    } else {
+      const row = p.new; if (!row || !row.id) return;
+      const i = signups.findIndex(x => x.id === row.id);
+      if (i >= 0) signups[i] = row; else signups.push(row);
+      if (isAdmin && p.eventType === "INSERT"){ clearTimeout(contactTimer); contactTimer = setTimeout(async () => { await loadContacts(); safeRender(); }, 1200); }
+    }
+    safeRender();
   }
   let saveTimer = null, saving = false, saveAgain = false, saveState = "saved";
   function showSave(state, text){
@@ -531,6 +572,7 @@ details.t > .body a.booklink{color:#D10000}
       const r = await sb.rpc("is_coach");
       isAdmin = !r.error && r.data === true;
     }
+    await loadContacts();
     render();
   }
   async function sendLink(email){
@@ -619,6 +661,35 @@ details.t > .body a.booklink{color:#D10000}
   const cityState = t => [t.city, t.state].filter(Boolean).join(", ");
   const mark = (v, label) => `<span class="mark ${v?"yes":"no"}" aria-label="${label} ${v?"current":"missing"}">${v?"✓":"Missing"}</span>`;
 
+  const pendingFor = t => signups.filter(x => x.tournament_id === t.id && x.status === "pending").sort((a,b) => String(a.created_at||"").localeCompare(String(b.created_at||"")));
+  function pendingHTML(t, w){
+    const ps = pendingFor(t); if (!ps.length) return "";
+    return `<div class="pendbox"><div class="pendhead"><span class="pill warn">Pending</span><span>${ps.length} sign-up${ps.length===1?"":"s"} waiting for a coach to confirm</span></div>
+      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Weight</th><th>Division</th><th class="c">AAU</th><th class="c">USA</th>${w?'<th>Parent contact</th><th class="c"><span hidden>Actions</span></th>':""}</tr></thead><tbody>
+      ${ps.map(x => `<tr class="pendrow" data-sid="${esc(x.id)}"><td>${esc(x.name)} <span class="pendtag">Pending</span></td><td class="mono">${esc(x.weight||"")}</td><td>${esc(x.division||"")}</td><td class="c">${mark(x.aau,"AAU")}</td><td class="c">${mark(x.usa,"USA")}</td>
+        ${w?`<td class="contact">${contacts[x.id] ? esc(contacts[x.id]) : '<span class="status">Not shared</span>'}</td><td class="c" style="white-space:nowrap"><button class="primary" data-act="sg-approve" style="padding:7px 10px">Approve</button> <button class="ghost danger" data-act="sg-remove">Remove</button></td>`:""}</tr>`).join("")}
+      </tbody></table></div></div>`;
+  }
+  function signupHTML(t){
+    const end = t.endDate || t.date || "";
+    if (end && end < todayISO) return "";
+    const msg = signupMsg[t.id];
+    if (msg) return `<div class="signup-done" role="status">${esc(msg)} <button type="button" class="ghost" data-act="signup-again">Sign up someone else</button></div>`;
+    if (!signupOpen.has(t.id)) return `<button type="button" class="primary signup-btn" data-act="signup-open">Sign up for this tournament</button>`;
+    return `<form class="signup-form" data-act="signup">
+        <div class="signup-title">Sign up for ${esc(t.name||"this tournament")}</div>
+        <div class="signup-grid">
+          <input name="sname" placeholder="Wrestler full name" aria-label="Wrestler full name" autocomplete="off" required>
+          <input name="sweight" placeholder="Weight" aria-label="Weight" required>
+          <select name="sdiv" aria-label="Division"><option value="">Division</option><optgroup label="Boys">${AGES.map(a => opt("Boys "+a, "")).join("")}</optgroup><optgroup label="Girls">${AGES.map(a => opt("Girls "+a, "")).join("")}</optgroup></select>
+          <input name="scontact" placeholder="Parent phone or email" aria-label="Parent phone or email" required>
+        </div>
+        <div class="signup-mem"><label class="inline"><input type="checkbox" name="saau"> AAU member</label><label class="inline"><input type="checkbox" name="susa"> USA Wrestling member</label></div>
+        <p class="status">A coach confirms each sign-up. Parent contact is only visible to coaches.</p>
+        <p class="err signup-err" hidden></p>
+        <div class="rowtools"><button type="submit" class="primary">Send sign-up</button><button type="button" class="ghost" data-act="signup-cancel">Cancel</button></div>
+      </form>`;
+  }
   function cardHTML(t){
     const w = canWrite(), wm = W();
     const p = parts(t.date), multi = !!(t.multiDay && t.endDate && t.endDate !== t.date) || (t.multiDay === undefined && t.endDate && t.endDate !== t.date);
@@ -668,6 +739,8 @@ details.t > .body a.booklink{color:#D10000}
         ${!w?`<div class="panel wide"><p class="affil-note"><svg class="affil-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 1.5 21h21L12 2.5Z" fill="#FF0D0D"/><rect x="11" y="9" width="2" height="6.5" fill="#FFFFFF"/><rect x="11" y="17" width="2" height="2" fill="#FFFFFF"/></svg><span>Be sure to affiliate with Mission Athletics (AAU: <strong class="code">UNDVDTX7F</strong> | USA: <strong class="code">2500163802</strong>).<br>This is how we are able to track you at the tournament and guarantee a coach will be in your corner.</span></p></div>`:""}
         <div class="panel wide"><h3>Team roster <span class="status">${n} entered · ${n-missA} AAU · ${n-missU} USA</span></h3>
           ${n?`<div class="tablewrap"><table><thead><tr><th rowspan="2">Wrestler</th><th rowspan="2">Weight</th><th class="grp" colspan="2">Affiliated</th>${w?'<th rowspan="2" class="c"><span hidden>Remove</span></th>':""}</tr><tr><th class="c sub">AAU</th><th class="c sub">USA</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="empty-note">Roster not posted yet.</p>`}
+          ${pendingHTML(t, w)}
+          ${!w ? signupHTML(t) : ""}
           ${w ? (data.wrestlers.length ? `<div class="rowtools">${avail.length ? `<select data-role="pick" aria-label="Add wrestler" style="flex:1;width:auto"><option value="">Add a wrestler from the team…</option>${avail.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.weight?" ("+esc(x.weight)+")":""}</option>`).join("")}</select><button data-act="add">Add</button><button data-act="addall">Add all ${avail.length}</button>` : `<span class="status">Everyone on the team is entered.</span>`}</div>` : "") +
             `<form class="addline-form" data-act="newwr"><input name="wname" placeholder="New wrestler full name" aria-label="New wrestler name" autocomplete="off" required><input name="wwt" placeholder="Weight" aria-label="Weight" style="max-width:100px;flex:0 1 100px"><button type="submit">Add new wrestler</button></form>` : ""}</div>
         <div class="panel wide"><h3>Messages from coaches</h3>
@@ -679,6 +752,59 @@ details.t > .body a.booklink{color:#D10000}
   function wire(el){
     const id = el.dataset.id;
     el.addEventListener("toggle", () => { el.open ? openIds.add(id) : openIds.delete(id); });
+    el.addEventListener("click", async e => {
+      const b = e.target.closest("button[data-act]"); if (!b) return;
+      const act = b.dataset.act;
+      if (act === "signup-open"){ signupOpen.add(id); render(); const i = document.querySelector(`details.t[data-id="${CSS.escape(id)}"] form[data-act="signup"] input`); if (i) i.focus(); }
+      if (act === "signup-cancel"){ signupOpen.delete(id); render(); }
+      if (act === "signup-again"){ delete signupMsg[id]; signupOpen.add(id); render(); }
+      if ((act === "sg-approve" || act === "sg-remove") && canWrite()){
+        const sid = b.closest("tr").dataset.sid, sg = signups.find(x => x.id === sid); if (!sg) return;
+        if (act === "sg-remove"){
+          if (!b.dataset.confirm){ b.dataset.confirm = "1"; b.textContent = "Confirm remove"; return; }
+          const r = await sb.from(SIGNUPS).delete().in("id", [sid]);
+          if (r.error){ showSave("error", "Couldn't remove the sign-up. Try again."); return; }
+          signups = signups.filter(x => x.id !== sid); render(); return;
+        }
+        // approve: add to the team list (or match an existing wrestler) and to this tournament's roster
+        change(d => {
+          const t = d.tournaments.find(x => x.id === id); if (!t) return;
+          let ex = d.wrestlers.find(x => normName(x.name) === normName(sg.name));
+          if (!ex){ const wid = rid(); ex = {id:wid, name:sg.name.trim(), weight:sg.weight||"", age:"", grade:"", aau:!!sg.aau, usa:!!sg.usa}; d.wrestlers.push(ex); }
+          else { if (sg.aau) ex.aau = true; if (sg.usa) ex.usa = true; }
+          t.entries = t.entries || [];
+          if (!t.entries.some(en => en.wid === ex.id)) t.entries.push({ wid:ex.id, weight:sg.weight||ex.weight||"", division:sg.division||"" });
+        });
+        const r = await sb.from(SIGNUPS).update({ status:"approved" }).eq("id", sid);
+        if (r.error){ showSave("error", "Added to the roster, but the sign-up couldn't be marked approved. Refresh and check."); return; }
+        sg.status = "approved"; render();
+      }
+    });
+    el.addEventListener("submit", async e => {
+      const f = e.target; if (f.dataset.act !== "signup") return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const val = n => { const x = f.querySelector(`[name="${n}"]`); return x ? x.value.trim() : ""; };
+      const chk = n => { const x = f.querySelector(`[name="${n}"]`); return !!(x && x.checked); };
+      const err = m => { const x = f.querySelector(".signup-err"); x.textContent = m; x.hidden = !m; };
+      const t = data.tournaments.find(x => x.id === id); if (!t) return;
+      const name = val("sname"), weight = val("sweight"), contact = val("scontact");
+      if (name.length < 2){ err("Enter the athlete's full name."); return; }
+      if (!weight){ err("Enter a weight."); return; }
+      if (contact.length < 3){ err("Enter a parent phone number or email."); return; }
+      const wm = W();
+      const already = (t.entries||[]).some(en => wm[en.wid] && normName(wm[en.wid].name) === normName(name)) || pendingFor(t).some(x => normName(x.name) === normName(name));
+      if (already){ err(name + " is already on the list for this tournament."); return; }
+      const btn = f.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = "Sending…";
+      const row = { id: uuid(), tournament_id: id, name, weight, division: val("sdiv") || null, aau: chk("saau"), usa: chk("susa"), ibjjf:false, belt:null, status:"pending" };
+      const r = await sb.from(SIGNUPS).insert(row);
+      if (r.error){ btn.disabled = false; btn.textContent = "Send sign-up"; err("Couldn't send the sign-up. Check your connection and try again."); return; }
+      const rc = await sb.from(CONTACTS).insert({ signup_id: row.id, contact });
+      if (rc.error) console.warn("Contact not saved", rc.error);
+      if (!signups.some(x => x.id === row.id)) signups.push(Object.assign({ created_at:new Date().toISOString() }, row));
+      signupOpen.delete(id);
+      signupMsg[id] = "Thanks! " + name + " is on the list as Pending until a coach confirms.";
+      render();
+    });
     if (!canWrite()) return;
     const T = () => data.tournaments.find(x => x.id === id);
     el.addEventListener("change", e => {
@@ -938,6 +1064,7 @@ details.t > .body a.booklink{color:#D10000}
     sb.channel("mtc-live")
       .on("postgres_changes", { event:"*", schema:"public", table:"tournaments" }, p => applyRemote("t", p))
       .on("postgres_changes", { event:"*", schema:"public", table:"wrestlers" }, p => applyRemote("w", p))
+      .on("postgres_changes", { event:"*", schema:"public", table:SIGNUPS }, p => applySignup(p))
       .subscribe();
   })();
 })();
