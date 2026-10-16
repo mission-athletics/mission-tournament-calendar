@@ -286,12 +286,17 @@ html.embed .wrap{padding-block:8px 24px}
 .pendrow td{background:#FFF8E6}
 .pendtag{display:inline-block;margin-left:6px;font:700 10px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;padding:3px 6px;background:#F2C700;color:#141416}
 td.contact{font-size:13px;overflow-wrap:anywhere}
-.signup-btn{align-self:flex-start}
+.signup-btn{align-self:flex-start;margin-bottom:6px}
+button.primary.signup-btn{background:#141416;border-color:#141416;color:#FFFFFF}
+button.primary.signup-btn:hover,button.primary.signup-btn:focus-visible{background:#2A2A2E;border-color:#2A2A2E;color:#FFFFFF}
 .signup-form{display:flex;flex-direction:column;gap:10px;background:#FFFFFF;border:1px solid #D4D4D8;border-top:4px solid #FF0D0D;padding:14px 16px}
 .signup-title{font:800 20px/1 var(--display);text-transform:uppercase;color:#141416}
 .signup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
 .signup-mem{display:flex;flex-wrap:wrap;gap:16px}
 .signup-mem label.inline{color:#141416}
+.signup-parent{display:flex;flex-direction:column;gap:6px;padding-top:4px;border-top:1px solid #E4E4E7}
+.signup-sub{font:700 13px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:#5F5F66;padding-top:8px}
+.signup-form input{min-width:0}
 .signup-done{background:#FFFFFF;border:1px solid #D4D4D8;border-left:5px solid #2E9B48;padding:12px 14px;color:#141416;font-weight:600;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 /* ---- Light theme inside an opened tournament card (header stays dark) ---- */
 details.t > .body{
@@ -664,8 +669,8 @@ details.t > .body a.booklink{color:#D10000}
   const pendingFor = t => signups.filter(x => x.tournament_id === t.id && x.status === "pending").sort((a,b) => String(a.created_at||"").localeCompare(String(b.created_at||"")));
   function contactHTML(c){
     if (!c) return '<span class="status">Not shared</span>';
-    const i = c.indexOf(" · ");
-    return i < 0 ? esc(c) : `<strong>${esc(c.slice(0, i))}</strong><br>${esc(c.slice(i + 3))}`;
+    const p = c.split(" · ");
+    return p.length < 2 ? esc(c) : `<strong>${esc(p[0])}</strong>` + p.slice(1).map(x => `<br>${esc(x)}`).join("");
   }
   function pendingHTML(t, w){
     const ps = pendingFor(t); if (!ps.length) return "";
@@ -687,10 +692,16 @@ details.t > .body a.booklink{color:#D10000}
           <input name="sname" placeholder="Wrestler full name" aria-label="Wrestler full name" autocomplete="off" required>
           <input name="sweight" placeholder="Weight" aria-label="Weight" required>
           <select name="sdiv" aria-label="Division"><option value="">Division</option><optgroup label="Boys">${AGES.map(a => opt("Boys "+a, "")).join("")}</optgroup><optgroup label="Girls">${AGES.map(a => opt("Girls "+a, "")).join("")}</optgroup></select>
-          <input name="sparent" placeholder="Parent name" aria-label="Parent name" autocomplete="name" required>
-          <input name="scontact" placeholder="Parent phone or email" aria-label="Parent phone or email" required>
         </div>
         <div class="signup-mem"><label class="inline"><input type="checkbox" name="saau"> AAU member</label><label class="inline"><input type="checkbox" name="susa"> USA Wrestling member</label></div>
+        <div class="signup-parent">
+          <div class="signup-sub">Parent or guardian</div>
+          <div class="signup-grid">
+            <input name="sparent" placeholder="Parent name" aria-label="Parent name" autocomplete="name" required>
+            <input name="sphone" type="tel" placeholder="Parent phone" aria-label="Parent phone" autocomplete="tel">
+            <input name="semail" type="email" placeholder="Parent email" aria-label="Parent email" autocomplete="email">
+          </div>
+        </div>
         <p class="status">A coach confirms each sign-up. Parent name and contact are only visible to coaches.</p>
         <p class="err signup-err" hidden></p>
         <div class="rowtools"><button type="submit" class="primary">Send sign-up</button><button type="button" class="ghost" data-act="signup-cancel">Cancel</button></div>
@@ -744,9 +755,9 @@ details.t > .body a.booklink{color:#D10000}
           ${w?`<form class="addline-form" data-act="addcoach"><input name="coach" list="coachNames" placeholder="Coach name" aria-label="Coach name" autocomplete="off" required><button type="submit">Add coach</button></form>`:""}</div>`:""}
         ${!w?`<div class="panel wide"><p class="affil-note"><svg class="affil-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 1.5 21h21L12 2.5Z" fill="#FF0D0D"/><rect x="11" y="9" width="2" height="6.5" fill="#FFFFFF"/><rect x="11" y="17" width="2" height="2" fill="#FFFFFF"/></svg><span>Be sure to affiliate with Mission Athletics (AAU: <strong class="code">UNDVDTX7F</strong> | USA: <strong class="code">2500163802</strong>).<br>This is how we are able to track you at the tournament and guarantee a coach will be in your corner.</span></p></div>`:""}
         <div class="panel wide"><h3>Team roster <span class="status">${n} entered · ${n-missA} AAU · ${n-missU} USA</span></h3>
+          ${!w ? signupHTML(t) : ""}
           ${n?`<div class="tablewrap"><table><thead><tr><th rowspan="2">Wrestler</th><th rowspan="2">Weight</th><th class="grp" colspan="2">Affiliated</th>${w?'<th rowspan="2" class="c"><span hidden>Remove</span></th>':""}</tr><tr><th class="c sub">AAU</th><th class="c sub">USA</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="empty-note">Roster not posted yet.</p>`}
           ${pendingHTML(t, w)}
-          ${!w ? signupHTML(t) : ""}
           ${w ? (data.wrestlers.length ? `<div class="rowtools">${avail.length ? `<select data-role="pick" aria-label="Add wrestler" style="flex:1;width:auto"><option value="">Add a wrestler from the team…</option>${avail.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.weight?" ("+esc(x.weight)+")":""}</option>`).join("")}</select><button data-act="add">Add</button><button data-act="addall">Add all ${avail.length}</button>` : `<span class="status">Everyone on the team is entered.</span>`}</div>` : "") +
             `<form class="addline-form" data-act="newwr"><input name="wname" placeholder="New wrestler full name" aria-label="New wrestler name" autocomplete="off" required><input name="wwt" placeholder="Weight" aria-label="Weight" style="max-width:100px;flex:0 1 100px"><button type="submit">Add new wrestler</button></form>` : ""}</div>
         <div class="panel wide"><h3>Messages from coaches</h3>
@@ -793,12 +804,13 @@ details.t > .body a.booklink{color:#D10000}
       const chk = n => { const x = f.querySelector(`[name="${n}"]`); return !!(x && x.checked); };
       const err = m => { const x = f.querySelector(".signup-err"); x.textContent = m; x.hidden = !m; };
       const t = data.tournaments.find(x => x.id === id); if (!t) return;
-      const name = val("sname"), weight = val("sweight"), parent = val("sparent"), phone = val("scontact");
+      const name = val("sname"), weight = val("sweight"), parent = val("sparent"), phone = val("sphone"), email = val("semail");
       if (name.length < 2){ err("Enter the athlete's full name."); return; }
       if (!weight){ err("Enter a weight."); return; }
       if (parent.length < 2){ err("Enter the parent's name."); return; }
-      if (phone.length < 3){ err("Enter a parent phone number or email."); return; }
-      const contact = (parent + " · " + phone).slice(0, 120);
+      if (!phone && !email){ err("Enter a parent phone number or email (or both)."); return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err("Check the parent email address."); return; }
+      const contact = [parent, phone, email].filter(Boolean).join(" · ").slice(0, 120);
       const wm = W();
       const already = (t.entries||[]).some(en => wm[en.wid] && normName(wm[en.wid].name) === normName(name)) || pendingFor(t).some(x => normName(x.name) === normName(name));
       if (already){ err(name + " is already on the list for this tournament."); return; }
